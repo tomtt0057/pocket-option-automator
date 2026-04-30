@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#121212"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <!-- App Title -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🤖 Pocket Option Bot"
+        android:textColor="#4CAF50"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:paddingTop="32dp"
+        android:paddingBottom="8dp" />
+
+    <!-- Subtitle -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Automated Trading Assistant"
+        android:textColor="#888888"
+        android:textSize="14sp"
+        android:gravity="center"
+        android:paddingBottom="32dp" />
+
+    <!-- Status Card -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#1E1E1E"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:layout_marginBottom="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="STATUS"
+            android:textColor="#888888"
+            android:textSize="12sp"
+            android:paddingBottom="8dp" />
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Bot is idle. Tap Start to begin."
+            android:textColor="#FFFFFF"
+            android:textSize="16sp" />
+
+    </LinearLayout>
+
+    <!-- Session Timer Card -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#1E1E1E"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:layout_marginBottom="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SESSION DURATION (HOURS)"
+            android:textColor="#888888"
+            android:textSize="12sp"
+            android:paddingBottom="8dp" />
+
+        <SeekBar
+            android:id="@+id/seekBarDuration"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="8"
+            android:progress="3"
+            android:progressTint="#4CAF50"
+            android:thumbTint="#4CAF50" />
+
+        <TextView
+            android:id="@+id/tvDuration"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="3 hours"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:paddingTop="8dp" />
+
+    </LinearLayout>
+
+    <!-- Start Button -->
+    <Button
+        android:id="@+id/btnStart"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:text="▶  START BOT"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:backgroundTint="#4CAF50"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Stop Button -->
+    <Button
+        android:id="@+id/btnStop"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:text="⏹  STOP BOT"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:backgroundTint="#F44336"
+        android:enabled="false" />
+
+    <!-- Permission Warning -->
+    <TextView
+        android:id="@+id/tvPermissionWarning"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="⚠️ Accessibility permission required. Tap here to enable."
+        android:textColor="#FF9800"
+        android:textSize="14sp"
+        android:gravity="center"
+        android:paddingTop="24dp"
+        android:visibility="gone" />
+
+    <!-- Trade Log -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="24dp">
+
+        <TextView
+            android:id="@+id/tvTradeLog"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Trade log will appear here..."
+            android:textColor="#888888"
+            android:textSize="12sp"
+            android:fontFamily="monospace"
+            android:padding="8dp" />
+
+    </ScrollView>
+
+</LinearLayout>
