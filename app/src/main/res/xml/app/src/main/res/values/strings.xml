@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pocket Bot</string>
+    <string name="accessibility_description">
+        Pocket Bot monitors your screen to automatically execute trades
+        on Pocket Option based on signals from your Telegram trading bot.
+    </string>
+    <string name="btn_start">Start Bot</string>
+    <string name="btn_stop">Stop Bot</string>
+    <string name="status_idle">Bot is idle. Tap Start to begin.</string>
+    <string name="status_running">Bot is running and watching for signals...</string>
+    <string name="status_stopped">Bot stopped.</string>
+    <string name="status_no_permission">Accessibility permission not granted. Please enable it in settings.</string>
+    <string name="notification_title">Pocket Bot Active</string>
+    <string name="notification_text">Bot is watching for trading signals...</string>
+    <string name="channel_name">Bot Notifications</string>
+    <string name="channel_description">Notifications from Pocket Option Bot</string>
+</resources>
