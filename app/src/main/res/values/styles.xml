@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Base app theme -->
+    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="colorPrimary">#1B5E20</item>
+        <item name="colorPrimaryDark">#003300</item>
+        <item name="colorAccent">#4CAF50</item>
+        <item name="android:windowBackground">#121212</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+    </style>
+
+    <!-- Style for Start button -->
+    <style name="StartButton">
+        <item name="android:background">#4CAF50</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:padding">16dp</item>
+        <item name="android:layout_margin">8dp</item>
+    </style>
+
+    <!-- Style for Stop button -->
+    <style name="StopButton">
+        <item name="android:background">#F44336</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:padding">16dp</item>
+        <item name="android:layout_margin">8dp</item>
+    </style>
+
+</resources>
