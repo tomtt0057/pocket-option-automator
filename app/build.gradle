@@ -4,6 +4,7 @@ plugins {
 }
 
 android {
+    namespace 'com.tomtt0057.pocketbot'
     compileSdk 34
 
     defaultConfig {
