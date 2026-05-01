@@ -9,11 +9,9 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
         android:label="Pocket Bot"
         android:theme="@style/AppTheme">
 
-        <!-- Main screen of the app -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -23,7 +21,6 @@
             </intent-filter>
         </activity>
 
-        <!-- The brain — Accessibility Service that controls the screen -->
         <service
             android:name=".BotAccessibilityService"
             android:exported="true"
@@ -37,7 +34,6 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
-        <!-- Keeps bot running in background -->
         <service
             android:name=".BotForegroundService"
             android:exported="false"
