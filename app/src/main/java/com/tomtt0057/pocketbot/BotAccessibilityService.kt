@@ -5,9 +5,14 @@ import android.accessibilityservice.GestureDescription
 import android.content.Intent
 import android.graphics.Path
 import android.graphics.Rect
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import org.json.JSONObject
+import java.net.URL
+import java.util.concurrent.Executors
 
 class BotAccessibilityService : AccessibilityService() {
 
@@ -16,167 +21,284 @@ class BotAccessibilityService : AccessibilityService() {
         const val POCKET_OPTION_PACKAGE = "com.po.app"
         const val TELEGRAM_PACKAGE = "org.telegram.messenger"
 
-        // Shared instance so MainActivity can communicate with service
+        // Your Railway API
+        const val API_URL = "https://apex-signal-bot-production-fa99.up.railway.app"
+        const val API_KEY = "apexbot2026"
+
+        // Signal interval — 5 minutes
+        const val SIGNAL_INTERVAL_MS = 5 * 60 * 1000L
+
         var instance: BotAccessibilityService? = null
         var isBotActive: Boolean = false
     }
 
+    private var pendingAsset: String = ""
+    private var pendingDirection: String = ""
+    private var waitingToTrade: Boolean = false
+    private val executor = Executors.newSingleThreadExecutor()
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var signalRunnable: Runnable? = null
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
-        Log.d(TAG, "✅ Accessibility Service connected and ready")
+        Log.d(TAG, "✅ Accessibility Service connected")
     }
 
+    // ─── Called when bot is started ───────────────────────────
+
+    fun startSignalLoop() {
+        Log.d(TAG, "🚀 Signal loop started")
+        sendLogToMain("🚀 Bot started — fetching first signal...")
+        fetchAndTrade()
+        scheduleNextSignal()
+    }
+
+    fun stopSignalLoop() {
+        signalRunnable?.let { mainHandler.removeCallbacks(it) }
+        signalRunnable = null
+        waitingToTrade = false
+        pendingAsset = ""
+        pendingDirection = ""
+        Log.d(TAG, "⏹ Signal loop stopped")
+    }
+
+    private fun scheduleNextSignal() {
+        signalRunnable = Runnable {
+            if (isBotActive) {
+                fetchAndTrade()
+                scheduleNextSignal()
+            }
+        }
+        mainHandler.postDelayed(signalRunnable!!, SIGNAL_INTERVAL_MS)
+        sendLogToMain("⏳ Next signal in 5 minutes...")
+    }
+
+    // ─── STEP 1: Fetch signal from Railway API ────────────────
+
+    private fun fetchAndTrade() {
+        if (!isBotActive) return
+        sendLogToMain("📡 Fetching signal from API...")
+
+        executor.execute {
+            try {
+                val url = "$API_URL/autoscan?key=$API_KEY&category=all"
+                val response = URL(url).readText()
+                val json = JSONObject(response)
+
+                val success = json.optBoolean("success", false)
+                val goodTime = json.optBoolean("good_time", true)
+                val signals = json.optJSONArray("signals")
+
+                if (!success || signals == null || signals.length() == 0) {
+                    mainHandler.post {
+                        sendLogToMain("⚠️ No strong signals right now. Waiting...")
+                    }
+                    return@execute
+                }
+
+                if (!goodTime) {
+                    mainHandler.post {
+                        sendLogToMain("⚠️ Slow market session. Skipping trade.")
+                    }
+                    return@execute
+                }
+
+                // Get the best signal (highest confidence)
+                val best = signals.getJSONObject(0)
+                val pair = best.optString("pair", "")
+                val signal = best.optString("signal", "HOLD")
+                val confidence = best.optInt("confidence", 0)
+                val confText = best.optString("confidence_text", "")
+                val entryPrice = best.optDouble("entry_price", 0.0)
+
+                // Skip HOLD signals
+                if (signal == "HOLD") {
+                    mainHandler.post {
+                        sendLogToMain("⏸ Signal is HOLD — skipping trade")
+                    }
+                    return@execute
+                }
+
+                // Skip low confidence
+                if (confidence < 4) {
+                    mainHandler.post {
+                        sendLogToMain("⚠️ Confidence too low ($confText) — skipping")
+                    }
+                    return@execute
+                }
+
+                mainHandler.post {
+                    sendLogToMain(
+                        "📊 Signal: $pair → $signal " +
+                        "($confText) @ $entryPrice"
+                    )
+                    pendingAsset = pair
+                    pendingDirection = signal
+                    waitingToTrade = true
+                    openPocketOption()
+                }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "API error: ${e.message}")
+                mainHandler.post {
+                    sendLogToMain("❌ API error — trying Telegram fallback...")
+                    // Fallback to Telegram signal reading
+                    switchToTelegramMode()
+                }
+            }
+        }
+    }
+
+    // ─── Telegram fallback mode ────────────────────────────────
+
+    private fun switchToTelegramMode() {
+        sendLogToMain("📱 Watching Telegram for signals...")
+    }
+
+    // ─── STEP 2: Screen event handler ─────────────────────────
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // Only act when bot is active
         if (!isBotActive) return
         if (event == null) return
-
         val packageName = event.packageName?.toString() ?: return
 
         when (packageName) {
-            TELEGRAM_PACKAGE -> {
-                // Telegram is open — check for new signals
-                handleTelegramEvent(event)
-            }
+            TELEGRAM_PACKAGE -> handleTelegramScreen()
             POCKET_OPTION_PACKAGE -> {
-                // Pocket Option is open — handle trading screen
-                handlePocketOptionEvent(event)
+                if (waitingToTrade) {
+                    handlePocketOptionScreen()
+                }
             }
         }
     }
 
-    // ─── TELEGRAM SIGNAL READING ───────────────────────────────────────────
+    // ─── Telegram signal reading (Option A fallback) ──────────
 
-    private fun handleTelegramEvent(event: AccessibilityEvent) {
-        val rootNode = rootInActiveWindow ?: return
+    private fun handleTelegramScreen() {
+        val root = rootInActiveWindow ?: return
+        val allText = extractAllText(root).joinToString(" ")
 
-        // Search all text on screen for trading signals
-        val allText = extractAllText(rootNode)
+        if (!allText.contains("AUTO-SIGNAL ALERT")) return
+        if (allText.contains("HOLD")) return
+        if (allText.contains("Low")) return
 
-        // Check if any text looks like a trading signal
-        allText.forEach { text ->
-            if (isTradeSignal(text)) {
-                Log.d(TAG, "📡 Signal detected: $text")
-                parseAndExecuteSignal(text)
-            }
-        }
-    }
-
-    // ─── SIGNAL DETECTION ──────────────────────────────────────────────────
-
-    private fun isTradeSignal(text: String): Boolean {
-        val upperText = text.uppercase()
-        // Signal must contain direction AND an asset name
-        val hasDirection = upperText.contains("CALL") ||
-                upperText.contains("PUT") ||
-                upperText.contains("BUY") ||
-                upperText.contains("SELL") ||
-                upperText.contains("UP") ||
-                upperText.contains("DOWN")
-        val hasAsset = upperText.contains("EUR") ||
-                upperText.contains("USD") ||
-                upperText.contains("GBP") ||
-                upperText.contains("BTC") ||
-                upperText.contains("ETH") ||
-                upperText.contains("OTC")
-        return hasDirection && hasAsset
-    }
-
-    // ─── SIGNAL PARSING ────────────────────────────────────────────────────
-
-    private fun parseAndExecuteSignal(signalText: String) {
-        val upperText = signalText.uppercase()
-
-        // Determine trade direction
         val direction = when {
-            upperText.contains("CALL") || upperText.contains("BUY") ||
-            upperText.contains("UP") -> "CALL"
-            upperText.contains("PUT") || upperText.contains("SELL") ||
-            upperText.contains("DOWN") -> "PUT"
-            else -> return // Unknown direction — skip
+            allText.contains("Signal:") &&
+            allText.contains("BUY") -> "BUY"
+            allText.contains("Signal:") &&
+            allText.contains("SELL") -> "SELL"
+            else -> return
         }
 
-        // Extract asset (basic detection)
-        val asset = when {
-            upperText.contains("EUR/USD") -> "EUR/USD"
-            upperText.contains("GBP/USD") -> "GBP/USD"
-            upperText.contains("EUR/GBP") -> "EUR/GBP"
-            upperText.contains("BTC") -> "BTC/USD"
-            upperText.contains("ETH") -> "ETH/USD"
-            else -> "EUR/USD" // Default asset
-        }
+        val asset = extractAsset(allText) ?: return
 
-        Log.d(TAG, "📊 Parsed signal — Asset: $asset | Direction: $direction")
+        pendingAsset = asset
+        pendingDirection = direction
+        waitingToTrade = true
 
-        // Open Pocket Option and execute trade
+        sendLogToMain("📡 Telegram signal: $asset → $direction")
         openPocketOption()
-
-        // Wait 3 seconds for app to open then place trade
-        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-            executeTrade(direction, asset)
-        }, 3000)
     }
 
-    // ─── POCKET OPTION HANDLER ─────────────────────────────────────────────
-
-    private fun handlePocketOptionEvent(event: AccessibilityEvent) {
-        // This will be expanded in the next phase
-        // For now just log that we can see the app
-        Log.d(TAG, "👁 Pocket Option screen detected")
+    private fun extractAsset(text: String): String? {
+        val assets = listOf(
+            "EUR/USD OTC", "GBP/USD OTC", "USD/JPY OTC",
+            "AUD/USD OTC", "NZD/USD OTC", "USD/CAD OTC",
+            "EUR/GBP OTC", "EUR/JPY OTC", "GBP/JPY OTC",
+            "EUR/USD", "GBP/USD", "USD/JPY", "USD/CHF",
+            "AUD/USD", "NZD/USD", "USD/CAD", "EUR/GBP",
+            "BTC/USD", "ETH/USD", "XRP/USD", "SOL/USD",
+            "BNB/USD", "ADA/USD", "DOGE/USD", "LTC/USD",
+            "Gold", "Silver"
+        )
+        return assets.firstOrNull {
+            text.contains(it, ignoreCase = true)
+        }
     }
 
-    // ─── TRADE EXECUTION ───────────────────────────────────────────────────
+    // ─── STEP 3: Handle Pocket Option screen ──────────────────
 
-    private fun executeTrade(direction: String, asset: String) {
-        val rootNode = rootInActiveWindow ?: run {
-            Log.e(TAG, "❌ Cannot access screen — root node is null")
+    private fun handlePocketOptionScreen() {
+        val root = rootInActiveWindow ?: return
+        val allText = extractAllText(root).joinToString(" ")
+
+        if (!allText.contains("BUY") || !allText.contains("SELL")) {
+            Log.d(TAG, "⏳ Waiting for trading screen...")
             return
         }
 
-        Log.d(TAG, "🎯 Executing $direction trade on $asset")
-
-        if (direction == "CALL") {
-            // Find and tap the CALL/UP/BUY button
-            val callButton = findNodeByText(rootNode, "Call") ?:
-                             findNodeByText(rootNode, "UP") ?:
-                             findNodeByText(rootNode, "Higher")
-            if (callButton != null) {
-                tapNode(callButton)
-                Log.d(TAG, "✅ CALL trade placed on $asset")
-            } else {
-                Log.e(TAG, "❌ Could not find CALL button on screen")
-            }
-        } else {
-            // Find and tap the PUT/DOWN/SELL button
-            val putButton = findNodeByText(rootNode, "Put") ?:
-                            findNodeByText(rootNode, "DOWN") ?:
-                            findNodeByText(rootNode, "Lower")
-            if (putButton != null) {
-                tapNode(putButton)
-                Log.d(TAG, "✅ PUT trade placed on $asset")
-            } else {
-                Log.e(TAG, "❌ Could not find PUT button on screen")
-            }
-        }
+        Log.d(TAG, "📱 Trading screen ready!")
+        mainHandler.postDelayed({ placeTrade() }, 2000)
     }
 
-    // ─── HELPER: Open Pocket Option ────────────────────────────────────────
+    // ─── STEP 4: Place the trade ───────────────────────────────
+
+    private fun placeTrade() {
+        val root = rootInActiveWindow ?: run {
+            sendLogToMain("❌ Cannot access screen")
+            waitingToTrade = false
+            return
+        }
+
+        Log.d(TAG, "🎯 Placing $pendingDirection on $pendingAsset")
+
+        if (pendingDirection == "BUY") {
+            val buyButton = findNodeByText(root, "BUY")
+                ?: findNodeByText(root, "Buy")
+                ?: findNodeByText(root, "HIGHER")
+            if (buyButton != null) {
+                tapNode(buyButton)
+                sendLogToMain("✅ BUY placed on $pendingAsset")
+            } else {
+                sendLogToMain("❌ BUY button not found")
+            }
+        } else {
+            val sellButton = findNodeByText(root, "SELL")
+                ?: findNodeByText(root, "Sell")
+                ?: findNodeByText(root, "LOWER")
+            if (sellButton != null) {
+                tapNode(sellButton)
+                sendLogToMain("✅ SELL placed on $pendingAsset")
+            } else {
+                sendLogToMain("❌ SELL button not found")
+            }
+        }
+
+        waitingToTrade = false
+        pendingAsset = ""
+        pendingDirection = ""
+    }
+
+    // ─── Open Pocket Option ────────────────────────────────────
 
     private fun openPocketOption() {
-        val intent = packageManager.getLaunchIntentForPackage(POCKET_OPTION_PACKAGE)
+        val intent = packageManager
+            .getLaunchIntentForPackage(POCKET_OPTION_PACKAGE)
         if (intent != null) {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             applicationContext.startActivity(intent)
-            Log.d(TAG, "📱 Opening Pocket Option...")
+            sendLogToMain("📱 Opening Pocket Option...")
         } else {
-            Log.e(TAG, "❌ Pocket Option app not found on device")
+            sendLogToMain("❌ Pocket Option not found!")
+            waitingToTrade = false
         }
     }
 
-    // ─── HELPER: Extract all text from screen ──────────────────────────────
+    // ─── Send log to MainActivity ──────────────────────────────
 
-    private fun extractAllText(node: AccessibilityNodeInfo): List<String> {
+    private fun sendLogToMain(message: String) {
+        val activity = MainActivity.instance
+        activity?.runOnUiThread {
+            activity.addToLog(message)
+        }
+    }
+
+    // ─── Helper: Extract all text ──────────────────────────────
+
+    private fun extractAllText(
+        node: AccessibilityNodeInfo
+    ): List<String> {
         val texts = mutableListOf<String>()
         val text = node.text?.toString()
         if (!text.isNullOrEmpty()) texts.add(text)
@@ -187,7 +309,7 @@ class BotAccessibilityService : AccessibilityService() {
         return texts
     }
 
-    // ─── HELPER: Find node by visible text ────────────────────────────────
+    // ─── Helper: Find node by text ─────────────────────────────
 
     private fun findNodeByText(
         root: AccessibilityNodeInfo,
@@ -197,43 +319,44 @@ class BotAccessibilityService : AccessibilityService() {
         return if (results.isNullOrEmpty()) null else results[0]
     }
 
-    // ─── HELPER: Tap a UI element ──────────────────────────────────────────
+    // ─── Helper: Tap a node ────────────────────────────────────
 
     private fun tapNode(node: AccessibilityNodeInfo) {
-        // Try direct click first
         if (node.isClickable) {
             node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
             return
         }
-        // If not clickable, use gesture tap on its position
         val rect = Rect()
         node.getBoundsInScreen(rect)
-        val x = rect.centerX().toFloat()
-        val y = rect.centerY().toFloat()
-        performTap(x, y)
+        performTap(
+            rect.centerX().toFloat(),
+            rect.centerY().toFloat()
+        )
     }
 
-    // ─── HELPER: Perform screen tap by coordinates ─────────────────────────
+    // ─── Helper: Tap by coordinates ───────────────────────────
 
     private fun performTap(x: Float, y: Float) {
         val path = Path()
         path.moveTo(x, y)
         val gesture = GestureDescription.Builder()
-            .addStroke(GestureDescription.StrokeDescription(path, 0, 100))
+            .addStroke(
+                GestureDescription.StrokeDescription(path, 0, 100)
+            )
             .build()
         dispatchGesture(gesture, null, null)
-        Log.d(TAG, "👆 Tapped screen at ($x, $y)")
     }
 
     override fun onInterrupt() {
-        Log.d(TAG, "⚠️ Accessibility Service interrupted")
         isBotActive = false
+        stopSignalLoop()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         instance = null
         isBotActive = false
-        Log.d(TAG, "🔴 Accessibility Service destroyed")
+        stopSignalLoop()
+        executor.shutdown()
     }
 }
