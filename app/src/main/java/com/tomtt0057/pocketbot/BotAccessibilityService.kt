@@ -288,10 +288,14 @@ class BotAccessibilityService : AccessibilityService() {
     // ─── Send log to MainActivity ──────────────────────────────
 
     private fun sendLogToMain(message: String) {
-        val activity = MainActivity.instance
-        activity?.runOnUiThread {
-            activity.addToLog(message)
+    Log.d(TAG, message)
+    mainHandler.post {
+        try {
+            MainActivity.instance?.addToLog(message)
+        } catch (e: Exception) {
+            Log.e(TAG, "Log error: ${e.message}")
         }
+    }
     }
 
     // ─── Helper: Extract all text ──────────────────────────────
