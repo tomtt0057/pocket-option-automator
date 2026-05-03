@@ -216,16 +216,36 @@ class BotAccessibilityService : AccessibilityService() {
     }
 
     private fun openPocketOption() {
-        val intent = packageManager
-            .getLaunchIntentForPackage(POCKET_OPTION_PACKAGE)
-        if (intent != null) {
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            applicationContext.startActivity(intent)
-            log("📱 Opening Pocket Option...")
-        } else {
-            log("❌ Pocket Option not found!")
+    try {
+        // Try direct activity launch first
+        val intent = Intent()
+        intent.setClassName(
+            POCKET_OPTION_PACKAGE,
+            "com.potradeweb.activities.MainActivity"
+        )
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+        applicationContext.startActivity(intent)
+        log("📱 Opening Pocket Option...")
+    } catch (e: Exception) {
+        // Fallback to package launcher
+        try {
+            val intent = packageManager
+                .getLaunchIntentForPackage(POCKET_OPTION_PACKAGE)
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                applicationContext.startActivity(intent)
+                log("📱 Opening Pocket Option (fallback)...")
+            } else {
+                log("❌ Pocket Option not found!")
+                waitingToTrade = false
+            }
+        } catch (e2: Exception) {
+            log("❌ Cannot open Pocket Option: ${e2.message}")
             waitingToTrade = false
         }
+    }
     }
 
     private fun log(message: String) {
