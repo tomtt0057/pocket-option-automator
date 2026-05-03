@@ -18,7 +18,7 @@ class BotAccessibilityService : AccessibilityService() {
 
     companion object {
         const val TAG = "PocketBot"
-        const val POCKET_OPTION_PACKAGE = "com.po.app"
+        const val POCKET_OPTION_PACKAGE = "com.pocketoption.broker"
         const val TELEGRAM_PACKAGE = "org.telegram.messenger"
         const val API_URL = "https://apex-signal-bot-production-fa99.up.railway.app"
         const val API_KEY = "apexbot2026"
