@@ -188,7 +188,7 @@ class BotAccessibilityService : AccessibilityService() {
                 handleAssetSelection(root, allText)
             }
             BotState.SETTING_TIMEFRAME -> {
-                handleTimeframeSelection(root, allText)
+    selectTimeframeOption(root)
             }
             BotState.PLACING_TRADE -> {
                 handleTradePlacement(root, allText)
