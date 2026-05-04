@@ -6,10 +6,12 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.provider.Settings
+import android.util.Log
 import android.view.accessibility.AccessibilityManager
 import android.widget.Button
 import android.widget.SeekBar
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
@@ -21,6 +23,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvPermissionWarning: TextView
     private lateinit var tvTradeLog: TextView
     private lateinit var seekBarDuration: SeekBar
+    private lateinit var updateManager: UpdateManager
 
     private var sessionTimer: CountDownTimer? = null
     private var sessionHours: Int = 3
@@ -28,6 +31,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        // Initialize update manager
+        updateManager = UpdateManager(this)
 
         btnStart = findViewById(R.id.btnStart)
         btnStop = findViewById(R.id.btnStop)
@@ -37,11 +43,9 @@ class MainActivity : AppCompatActivity() {
         tvTradeLog = findViewById(R.id.tvTradeLog)
         seekBarDuration = findViewById(R.id.seekBarDuration)
 
-        // Set log listener so bot can write to trade log
+        // Set log listener
         BotAccessibilityService.logListener = { message ->
             runOnUiThread { addToLog(message) }
-        // Check for updates when app opens
-        checkForUpdates()
         }
 
         seekBarDuration.setOnSeekBarChangeListener(
@@ -77,42 +81,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         tvPermissionWarning.setOnClickListener {
-        private fun checkForUpdates() {
-    val updateManager = UpdateManager(this)
-    updateManager.checkForUpdate(
-        onUpdateAvailable = { versionName, notes, apkUrl ->
-            // Show update dialog
-            androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("🆕 Update Available — v$versionName")
-                .setMessage("What's new:\n$notes\n\nWould you like to update now?")
-                .setPositiveButton("Update Now") { _, _ ->
-                    addToLog("⬇️ Starting update download...")
-                    updateManager.downloadAndInstall(apkUrl) { progress ->
-                        addToLog(progress)
-                    }
-                }
-                .setNegativeButton("Later") { dialog, _ ->
-                    dialog.dismiss()
-                    addToLog("ℹ️ Update postponed. You can update later.")
-                }
-                .setCancelable(false)
-                .show()
-        },
-        onNoUpdate = {
-            Log.d("UpdateManager", "App is up to date")
-        },
-        onError = { error ->
-            Log.d("UpdateManager", "Update check failed: $error")
-        }
-    )
-        }
             openAccessibilitySettings()
         }
+
+        // Check for updates when app opens
+        checkForUpdates()
     }
 
     override fun onResume() {
         super.onResume()
-        // Reconnect log listener every time app comes to foreground
         BotAccessibilityService.logListener = { message ->
             runOnUiThread { addToLog(message) }
         }
@@ -127,6 +104,34 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun checkForUpdates() {
+        updateManager.checkForUpdate(
+            onUpdateAvailable = { versionName, notes, apkUrl ->
+                AlertDialog.Builder(this)
+                    .setTitle("🆕 Update Available — v$versionName")
+                    .setMessage("What's new:\n$notes\n\nUpdate now?")
+                    .setPositiveButton("Update Now") { _, _ ->
+                        addToLog("⬇️ Starting update download...")
+                        updateManager.downloadAndInstall(apkUrl) { progress ->
+                            addToLog(progress)
+                        }
+                    }
+                    .setNegativeButton("Later") { dialog, _ ->
+                        dialog.dismiss()
+                        addToLog("ℹ️ Update postponed.")
+                    }
+                    .setCancelable(false)
+                    .show()
+            },
+            onNoUpdate = {
+                Log.d("MainActivity", "App is up to date")
+            },
+            onError = { error ->
+                Log.d("MainActivity", "Update check failed: $error")
+            }
+        )
+    }
+
     private fun startBot() {
         tvStatus.text = "🟢 Bot running — fetching signals..."
         btnStart.isEnabled = false
@@ -134,15 +139,12 @@ class MainActivity : AppCompatActivity() {
         seekBarDuration.isEnabled = false
         tvPermissionWarning.visibility = android.view.View.GONE
 
-        // Start foreground service
         val serviceIntent = Intent(this, BotForegroundService::class.java)
         startForegroundService(serviceIntent)
 
-        // Activate bot and start signal loop
         BotAccessibilityService.isBotActive = true
         BotAccessibilityService.instance?.startSignalLoop()
 
-        // Start session countdown timer
         val durationMillis = sessionHours * 60 * 60 * 1000L
         sessionTimer = object : CountDownTimer(durationMillis, 60000) {
             override fun onTick(millisUntilFinished: Long) {
@@ -173,11 +175,9 @@ class MainActivity : AppCompatActivity() {
         btnStop.isEnabled = false
         seekBarDuration.isEnabled = true
 
-        // Stop bot and signal loop
         BotAccessibilityService.isBotActive = false
         BotAccessibilityService.instance?.stopSignalLoop()
 
-        // Stop foreground service
         val serviceIntent = Intent(this, BotForegroundService::class.java)
         stopService(serviceIntent)
 
