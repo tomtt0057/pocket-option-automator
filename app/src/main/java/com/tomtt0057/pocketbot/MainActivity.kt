@@ -40,6 +40,8 @@ class MainActivity : AppCompatActivity() {
         // Set log listener so bot can write to trade log
         BotAccessibilityService.logListener = { message ->
             runOnUiThread { addToLog(message) }
+        // Check for updates when app opens
+        checkForUpdates()
         }
 
         seekBarDuration.setOnSeekBarChangeListener(
@@ -75,6 +77,35 @@ class MainActivity : AppCompatActivity() {
         }
 
         tvPermissionWarning.setOnClickListener {
+        private fun checkForUpdates() {
+    val updateManager = UpdateManager(this)
+    updateManager.checkForUpdate(
+        onUpdateAvailable = { versionName, notes, apkUrl ->
+            // Show update dialog
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("🆕 Update Available — v$versionName")
+                .setMessage("What's new:\n$notes\n\nWould you like to update now?")
+                .setPositiveButton("Update Now") { _, _ ->
+                    addToLog("⬇️ Starting update download...")
+                    updateManager.downloadAndInstall(apkUrl) { progress ->
+                        addToLog(progress)
+                    }
+                }
+                .setNegativeButton("Later") { dialog, _ ->
+                    dialog.dismiss()
+                    addToLog("ℹ️ Update postponed. You can update later.")
+                }
+                .setCancelable(false)
+                .show()
+        },
+        onNoUpdate = {
+            Log.d("UpdateManager", "App is up to date")
+        },
+        onError = { error ->
+            Log.d("UpdateManager", "Update check failed: $error")
+        }
+    )
+        }
             openAccessibilitySettings()
         }
     }
