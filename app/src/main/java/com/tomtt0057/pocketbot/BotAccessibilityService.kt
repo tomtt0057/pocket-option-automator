@@ -22,7 +22,7 @@ class BotAccessibilityService : AccessibilityService() {
         const val TELEGRAM_PACKAGE = "org.telegram.messenger"
         const val API_URL = "https://apex-signal-bot-production-fa99.up.railway.app"
         const val API_KEY = "apexbot2026"
-        const val SIGNAL_INTERVAL_MS = 5 * 60 * 1000L
+        const val SIGNAL_INTERVAL_MS = 1 * 60 * 1000L
         var instance: BotAccessibilityService? = null
         var isBotActive: Boolean = false
         var logListener: ((String) -> Unit)? = null
@@ -80,7 +80,7 @@ class BotAccessibilityService : AccessibilityService() {
             }
         }
         mainHandler.postDelayed(signalRunnable!!, SIGNAL_INTERVAL_MS)
-        log("⏳ Next signal in 5 minutes...")
+       log("⏳ Next signal in 1 minute...")
     }
 
     // ─── FETCH SIGNAL FROM API ─────────────────────────────────
