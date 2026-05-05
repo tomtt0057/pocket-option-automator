@@ -17,7 +17,7 @@ android {
 
     signingConfigs {
         release {
-            storeFile file("keystore.jks")
+            storeFile rootProject.file("keystore.jks")
             storePassword System.getProperty(
                 "android.injected.signing.store.password", ""
             )
