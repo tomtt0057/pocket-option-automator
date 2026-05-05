@@ -11,13 +11,29 @@ android {
         applicationId "com.tomtt0057.pocketbot"
         minSdk 26
         targetSdk 34
-        versionCode 2
-        versionName "1.1.0"
+        versionCode 4
+        versionName "1.2.1"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("keystore.jks")
+            storePassword System.getProperty(
+                "android.injected.signing.store.password", ""
+            )
+            keyAlias System.getProperty(
+                "android.injected.signing.key.alias", ""
+            )
+            keyPassword System.getProperty(
+                "android.injected.signing.key.password", ""
+            )
+        }
     }
 
     buildTypes {
         release {
             minifyEnabled false
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile(
                 'proguard-android-optimize.txt'
             ), 'proguard-rules.pro'
