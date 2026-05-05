@@ -200,62 +200,99 @@ class BotAccessibilityService : AccessibilityService() {
     // ─── STEP 1: Check account type ────────────────────────────
 
     private fun checkAndSwitchToDemoAccount(
-        root: AccessibilityNodeInfo,
-        allText: String
-    ) {
-        log("🔍 Checking account type...")
+    root: AccessibilityNodeInfo,
+    allText: String
+) {
+    log("🔍 Checking account type...")
 
-        // Check if already on demo account
-        if (allText.contains("Demo", ignoreCase = true) ||
-            allText.contains("QT Demo", ignoreCase = true)) {
-            log("✅ Already on Demo account")
-            currentState = BotState.SELECTING_ASSET
-            mainHandler.postDelayed({
-                openAssetSelector(root)
-            }, 1000)
-            return
-        }
-
-        // Check if on real account — need to switch
-        if (allText.contains("Real", ignoreCase = true) ||
-            allText.contains("QT Real", ignoreCase = true)) {
-            log("🔄 Switching to Demo account...")
-            currentState = BotState.SWITCHING_TO_DEMO
-            // Tap the balance/account area at the top
-            tapAccountSelector(root)
-            return
-        }
-
-        // App just opened — wait for it to load
-        log("⏳ Waiting for Pocket Option to load...")
+    // If already on demo account — go straight to trading
+    if (allText.contains("QT Demo", ignoreCase = true) ||
+        allText.contains("Demo", ignoreCase = true) &&
+        !allText.contains("QT Real", ignoreCase = true)) {
+        log("✅ Already on Demo account — proceeding")
+        currentState = BotState.SELECTING_ASSET
         mainHandler.postDelayed({
-            currentState = BotState.CHECKING_ACCOUNT
-        }, 2000)
+            val newRoot = rootInActiveWindow ?: return@postDelayed
+            openAssetSelector(newRoot)
+        }, 1000)
+        return
+    }
+
+    // On Real account — need to tap balance at top right
+    // to open account switcher dropdown
+    log("🔄 On Real account — switching to Demo...")
+    currentState = BotState.SWITCHING_TO_DEMO
+
+    val screenWidth = resources.displayMetrics.widthPixels
+    val screenHeight = resources.displayMetrics.heightPixels
+
+    // Tap balance area at TOP RIGHT of screen
+    // This is where Pocket Option shows the account balance
+    performTap(screenWidth * 0.72f, screenHeight * 0.07f)
+    log("👆 Tapping balance at top right to open account menu...")
+
+    // Wait for dropdown menu to appear then select Demo
+    mainHandler.postDelayed({
+        val newRoot = rootInActiveWindow ?: return@postDelayed
+        val newText = extractAllText(newRoot).joinToString(" ")
+        handleDemoAccountSwitch(newRoot, newText)
+    }, 1500)
     }
 
     // ─── STEP 2: Switch to demo account ────────────────────────
 
     private fun handleDemoAccountSwitch(
-        root: AccessibilityNodeInfo,
-        allText: String
-    ) {
-        // Look for demo option in the account menu
-        val demoNode = findNodeByText(root, "Demo")
-            ?: findNodeByText(root, "QT Demo")
-            ?: findNodeByText(root, "Practice")
+    root: AccessibilityNodeInfo,
+    allText: String
+) {
+    log("📋 Account menu open — looking for Demo option...")
 
-        if (demoNode != null) {
-            log("✅ Tapping Demo account option...")
-            tapNode(demoNode)
-            currentState = BotState.SELECTING_ASSET
-            mainHandler.postDelayed({
-                val newRoot = rootInActiveWindow ?: return@postDelayed
-                openAssetSelector(newRoot)
-            }, 1500)
-        } else {
-            // Try tapping the balance area at top of screen
-            tapAccountSelector(root)
-        }
+    // Look for Demo option in the dropdown menu
+    val demoNode = findNodeByText(root, "QT Demo")
+        ?: findNodeByText(root, "Demo")
+        ?: findNodeByText(root, "Practice")
+        ?: findNodeByText(root, "DEMO")
+
+    if (demoNode != null) {
+        log("✅ Found Demo option — tapping...")
+        tapNode(demoNode)
+        currentState = BotState.SELECTING_ASSET
+        mainHandler.postDelayed({
+            val newRoot = rootInActiveWindow ?: return@postDelayed
+            openAssetSelector(newRoot)
+        }, 2000)
+    } else {
+        // Menu might not have opened — try tapping balance again
+        // but slightly different position
+        val screenWidth = resources.displayMetrics.widthPixels
+        val screenHeight = resources.displayMetrics.heightPixels
+        performTap(screenWidth * 0.75f, screenHeight * 0.07f)
+        log("👆 Retrying balance tap...")
+
+        mainHandler.postDelayed({
+            val newRoot = rootInActiveWindow ?: return@postDelayed
+            val newText = extractAllText(newRoot).joinToString(" ")
+
+            // Try one more time to find demo
+            val retryDemo = findNodeByText(newRoot, "QT Demo")
+                ?: findNodeByText(newRoot, "Demo")
+            if (retryDemo != null) {
+                tapNode(retryDemo)
+                log("✅ Demo account selected!")
+                currentState = BotState.SELECTING_ASSET
+                mainHandler.postDelayed({
+                    val r = rootInActiveWindow ?: return@postDelayed
+                    openAssetSelector(r)
+                }, 2000)
+            } else {
+                // Cannot find demo — skip and trade on whatever account is open
+                log("⚠️ Cannot find Demo option — trading on current account")
+                currentState = BotState.SELECTING_ASSET
+                val r = rootInActiveWindow ?: return@postDelayed
+                openAssetSelector(r)
+            }
+        }, 1500)
+    }
     }
 
     // ─── STEP 3: Open asset selector ───────────────────────────
