@@ -1,6 +1,6 @@
 {
-  "version_code": 2,
-  "version_name": "1.1.0",
+  "version_code": 3,
+  "version_name": "1.2.0",
   "apk_url": "https://github.com/tomtt0057/pocket-option-automator/releases/download/v1.1.0/app-debug.apk",
   "release_notes": "Full Pocket Option navigation, auto account switching, 80+ pairs scanning, 60 second signals, auto-update system",
   "force_update": true
