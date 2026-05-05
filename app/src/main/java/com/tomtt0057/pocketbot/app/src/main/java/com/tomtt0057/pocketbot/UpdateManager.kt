@@ -113,10 +113,18 @@ class UpdateManager(private val context: Context) {
                 }
             }
 
-            context.registerReceiver(
-                receiver,
-                IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
-            )
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+    context.registerReceiver(
+        receiver,
+        IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+        Context.RECEIVER_NOT_EXPORTED
+    )
+} else {
+    context.registerReceiver(
+        receiver,
+        IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+    )
+            }
 
         } catch (e: Exception) {
             Log.e(TAG, "Download error: ${e.message}")
