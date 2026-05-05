@@ -27,11 +27,20 @@ jobs:
         with:
           gradle-version: '8.2'
 
-      - name: Build Debug APK
-        run: gradle assembleDebug
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/keystore.jks
+
+      - name: Build Signed Release APK
+        run: |
+          gradle assembleRelease \
+            -Pandroid.injected.signing.store.file=app/keystore.jks \
+            -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: pocket-bot-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: pocket-bot-release
+          path: app/build/outputs/apk/release/app-release.apk
