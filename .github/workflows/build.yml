@@ -29,15 +29,13 @@ jobs:
 
       - name: Decode keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > $GITHUB_WORKSPACE/app/keystore.jks
+          ls -la $GITHUB_WORKSPACE/app/keystore.jks
 
       - name: Build Signed Release APK
         run: |
           gradle assembleRelease \
-            -Pandroid.injected.signing.store.file=keystore.jks \
-            -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
-            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
-            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}"
+            -Pandroid.injected.signing.store.file=$GITHUB_WORKSPACE/app/keystore.jks \
             -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
             -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
             -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}"
